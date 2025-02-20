@@ -1,0 +1,202 @@
+---
+title: "315HW4"
+author: "Elan Satchit"
+date: "2025-02-17"
+output: pdf_document
+latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+[GITHUB REPO](https://github.com/elansatchit/SDS315HW4)
+
+# Problem 1 - Iron Bank
+
+## Null Hypothesis
+
+The SEC expects that flagged trades happen randomly at a normal rate of 2.4%. If nothing unusual is happening at Iron Bank, the number of flagged trades should be close to what we would expect based on this normal rate.
+
+## Test Statistic
+
+We will measure how many trades were flagged out of 2021 total trades and compare it to what we would expect if everything was normal.
+
+## Probability Distribution
+```{r echo = FALSE}
+library(ggplot2)
+
+total_trades <- 2021
+flagged_trades <- 70
+expected_rate <- 0.024
+
+simulated_flags <- rbinom(100000, size = total_trades, prob = expected_rate)
+p_value <- mean(simulated_flags >= flagged_trades)
+
+ggplot(data = data.frame(simulated_flags), aes(x = simulated_flags)) +
+  geom_histogram(binwidth = 1, fill = "blue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = flagged_trades, color = "red", linetype = "dashed") +
+  labs(title = "Flagged Trades Distribution If Nothing Unusual Is Happening",
+       x = "Number of Flagged Trades",
+       y = "Frequency") +
+  theme_minimal()
+
+p_value
+
+```
+
+The P value is `r round(p_value, 5)`, which is very low. This suggests that getting 70 flagged trades, or a rate of 2.4%, by random chance is highly unlikely. This also suggests that something unusual is happening at Iron Bank, and the SEC's decision to investigate the situation is statistically justified. 
+
+
+# Problem 2
+
+## Null Hypothesis
+The Health Department assumes that Gourmet Bites has the same violation rate as all restaurants in the city, which is 3%. If this is true, the number of violations should follow the normal pattern.
+
+## Test Statistic
+The test statistic is the number of health code violations observed** in 50 inspections.
+
+```{r echo = FALSE}
+total_inspections <- 50
+violations_observed <- 8
+base_rate <- 0.03
+
+simulated_violations <- rbinom(100000, size = total_inspections, prob = base_rate)
+
+p_value <- mean(simulated_violations >= violations_observed)
+
+ggplot(data = data.frame(simulated_violations), aes(x = simulated_violations)) +
+  geom_histogram(binwidth = 1, fill = "blue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = violations_observed, color = "red", linetype = "dashed") +
+  labs(title = "Health Violations Distribution If Gourmet Bites Was Normal",
+       x = "Number of Health Violations",
+       y = "Frequency") +
+  theme_minimal()
+
+p_value
+
+```
+
+The p-value is `r round(p_value, 5)`, which is extremely low. This means that getting 8 or more violations just by random chance is highly unlikely.
+
+This suggests that Gourmet Bites has a significantly higher rate of health violations than expected, and further investigation is strongly justified.
+
+# Problem 3
+
+## Null Hypothesis (H0)
+The judge’s juries are selected fairly and reflect the county’s racial/ethnic proportions. Any differences in jury selection are due to random variation.
+
+## Test Statistic (T)
+We use a Chi-Square Goodness-of-Fit Test to compare the observed jury composition to the expected distribution based on the county’s demographics.
+
+## Probability of T Given H0 (P(T | H0))
+
+```{r echo = FALSE}
+county_proportions <- c(0.30, 0.25, 0.20, 0.15, 0.10)  
+jury_counts <- c(85, 56, 59, 27, 13) 
+total_jurors <- sum(jury_counts)
+expected <- county_proportions * total_jurors
+
+chi_test <- chisq.test(x = jury_counts, p = county_proportions, rescale.p = TRUE)
+
+chi_stat <- chi_test$statistic
+p_value <- chi_test$p.value
+
+print(chi_stat)
+print(p_value)
+```
+
+The test statistic (Chi-Squared) of `r round(chi_stat, 2)` and the p-value of `r round(p_value, 5)`, both suggest that we reject the null hypothesis. 
+
+This result suggests that the judge’s juries do not reflect the county’s demographics and that some factor other than random variation is affecting jury composition. While this does not prove intentional bias, it raises concerns that should be investigated.
+
+Some potential explanations for these results are that some demographic groups might be less likely to respond to jury duty summons than others. Another possibility is that some groups might be disproportionately excused due to outside factors. 
+
+To investigate this further, we could compare jury pools prior to final selection, to see if differences are already present there. Additionally, we could examine this pattern under other judges to see if it still holds. This will help us understand if it is judge-specific, or a wider systemic issue. 
+
+# Problem 4
+## Part A
+```{r echo = FALSE, message = FALSE}
+library(tidyverse)
+library(knitr)
+letter_freqs <- read.csv("letter_frequencies.csv")
+brown_sentences <- readLines("brown_sentences.txt")
+clean_text <- function(sentence) {
+  sentence <- gsub("[^A-Za-z]", "", sentence) 
+  sentence <- toupper(sentence)
+  table(factor(strsplit(sentence, "")[[1]], levels = LETTERS))
+
+}
+
+colnames(letter_freqs) <- c("Letter", "Frequency")  # Ensure columns are labeled
+letter_freqs$Letter <- toupper(letter_freqs$Letter)  # Convert letters to uppercase
+letter_freqs <- letter_freqs[order(letter_freqs$Letter), ]  # Ensure correct order
+
+
+  compute_chi_squared <- function(sentence) {
+  observed_counts <- clean_text(sentence)
+  sentence_length <- sum(observed_counts)  # Total letters in sentence
+
+  if (sentence_length == 0) return(NA)  # Avoid division by zero for empty
+
+  expected_counts <- letter_freqs$Frequency * sentence_length
+
+
+  chi_squared <- sum((observed_counts - expected_counts)^2 / expected_counts, na.rm = TRUE)
+
+  return(chi_squared)
+}
+ chi_squared_values <- sapply(brown_sentences, compute_chi_squared)
+
+
+chi_squared_values <- chi_squared_values[!is.na(chi_squared_values)]
+
+print(summary(chi_squared_values))
+
+```
+
+## Part B: Checking for a Watermark
+
+```{r echo = FALSE, output = FALSE}
+# Define the test sentences
+test_sentences <- c(
+  "She opened the book and started to read the first chapter, eagerly anticipating what might come next.",
+  "Despite the heavy rain, they decided to go for a long walk in the park, crossing the main avenue by the fountain in the center.",
+  "The museums new exhibit features ancient artifacts from various civilizations around the world.",
+  "He carefully examined the document, looking for any clues that might help solve the mystery.",
+  "The students gathered in the auditorium to listen to the guest speakers inspiring lecture.",
+  "Feeling vexed after an arduous and zany day at work, she hoped for a peaceful and quiet evening at home, cozying up after a quick dinner with some TV, or maybe a book on her upcoming visit to Auckland.",
+  "The chef demonstrated how to prepare a delicious meal using only locally sourced ingredients, focusing mainly on some excellent dinner recipes from Spain.",
+  "They watched the sunset from the hilltop, marveling at the beautiful array of colors in the sky.",
+  "The committee reviewed the proposal and provided many points of useful feedback to improve the projects effectiveness.",
+  "Despite the challenges faced during the project, the team worked tirelessly to ensure its successful completion, resulting in a product that exceeded everyones expectations."
+)
+
+compute_chi_squared <- function(sentence, letter_freqs) {
+  observed_counts <- clean_text(sentence)
+  sentence_length <- sum(observed_counts)
+  if (sentence_length == 0) return(NA)
+
+  expected_counts <- letter_freqs$Frequency * sentence_length
+  chi_squared <- sum((observed_counts - expected_counts)^2 / expected_counts, na.rm = TRUE)
+  return(chi_squared)
+}
+
+# Calculate p-values
+p_values <- sapply(test_sentences, function(sentence) {
+  observed_chi_squared <- compute_chi_squared(sentence, letter_freqs)
+  p_value <- sum(chi_squared_values >= observed_chi_squared) / length(chi_squared_values)
+  return(p_value)
+})
+
+# Output the table of p-values
+p_values_table <- data.frame(Sentence = test_sentences, P_Value = round(p_values, 3))
+kable(p_values_table, format = "markdown", digits = 3)
+```
+
+The sentence that was written by a LLM is: 
+
+"Feeling vexed after an arduous and zany day at work, she hoped for a peaceful and quiet evening at home, cozying up after a quick dinner with some TV, or maybe a book on her upcoming visit to Auckland."
+
+This is because of the abnormally low P-value of 0.009.
